@@ -1,16 +1,16 @@
 import asyncio
 
-from broker import psqlpy_result_backend
+from broker import db_rb
 
 
 async def main():
-    await psqlpy_result_backend.startup()
+    await db_rb.startup()
 
-    result = await psqlpy_result_backend.get_result("b29c4c25b01a43c6abeab84968280f89")
+    result = await db_rb.get_result("0a1a587677d8487a86c958439f8996f2")
 
     print(result, type(result))
 
-    await psqlpy_result_backend.shutdown()
+    await db_rb.shutdown()
 
 
 if __name__ == "__main__":

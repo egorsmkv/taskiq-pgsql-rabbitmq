@@ -10,6 +10,12 @@ source .venv/bin/activate
 uv sync
 ```
 
+## Run PostgreSQL & RabbitMQ
+
+```
+docker compose -f compose-dev.yml up
+```
+
 ## Start workers
 
 ```
@@ -27,11 +33,11 @@ python create_tasks.py
 ```
 uv pip install ruff
 
-ruff check
+ruff check --select I --fix
 ruff format
 ```
 
-Look into the tables:
+If you want to see the results:
 
 ```
 docker exec -it pgsql_dev psql -U my_user -d my_db

@@ -1,7 +1,7 @@
 import pickle
-from typing import Any, Final, Literal, Optional, TypeVar, cast
+from typing import Any, Dict, Final, Literal, Optional, TypeVar, cast
 
-from psqlpy import ConnectionPool
+from psqlpy import ConnectionPool, SingleQueryResult
 from psqlpy.exceptions import RustPSQLDriverPyBaseError
 from taskiq import AsyncResultBackend, TaskiqResult
 
@@ -86,7 +86,11 @@ class PSQLPyResultBackend(AsyncResultBackend[_ReturnType]):
             ),
             parameters=[
                 task_id,
-                pickle.dumps(result),
+                result.execution_time,
+                result.is_err,
+                pickle.dumps(result.error),
+                pickle.dumps(result.labels),
+                pickle.dumps(result.return_value),
             ],
         )
 
@@ -123,15 +127,22 @@ class PSQLPyResultBackend(AsyncResultBackend[_ReturnType]):
         """
         connection: Final = await self._database_pool.connection()
         try:
-            result_in_bytes = cast(
-                bytes,
-                await connection.fetch_val(
-                    querystring=SELECT_RESULT_QUERY.format(
-                        self.table_name,
-                    ),
-                    parameters=[task_id],
+            query_result: SingleQueryResult = await connection.fetch_row(
+                querystring=SELECT_RESULT_QUERY.format(
+                    self.table_name,
                 ),
+                parameters=[task_id],
             )
+            dict_result: Dict[Any, Any] = query_result.result()
+
+            if isinstance(dict_result["error"], list):
+                dict_result["error"] = bytes(dict_result["error"])
+
+            if isinstance(dict_result["labels"], list):
+                dict_result["labels"] = bytes(dict_result["labels"])
+
+            if isinstance(dict_result["return_value"], list):
+                dict_result["return_value"] = bytes(dict_result["return_value"])
         except RustPSQLDriverPyBaseError as exc:
             raise ResultIsMissingError(
                 f"Cannot find record with task_id = {task_id} in PostgreSQL",
@@ -145,11 +156,12 @@ class PSQLPyResultBackend(AsyncResultBackend[_ReturnType]):
                 parameters=[task_id],
             )
 
-        if isinstance(result_in_bytes, list):
-            result_in_bytes = bytes(result_in_bytes)
-
-        taskiq_result: Final = pickle.loads(  # noqa: S301
-            result_in_bytes,
+        taskiq_result = TaskiqResult(
+            execution_time=dict_result["execution_time"],
+            is_err=dict_result["is_err"],
+            error=pickle.loads(dict_result["error"]),
+            labels=pickle.loads(dict_result["labels"]),
+            return_value=pickle.loads(dict_result["return_value"]),
         )
 
         if not with_logs:

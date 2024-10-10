@@ -312,7 +312,7 @@ wheels = [
 [[package]]
 name = "taskiq-pgsql-rabbitmq"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "psqlpy" },
     { name = "taskiq" },
